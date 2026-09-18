@@ -172,6 +172,35 @@ void MainWidget::resizeEvent(QResizeEvent *event)
 	if (windowHandle()) {
 		HWND handle = reinterpret_cast<HWND>(windowHandle()->winId());
 		SetWindowLongPtr(handle, GWL_STYLE, GetWindowLongPtr(handle, GWL_STYLE) | WS_BORDER);
+
+		// 上記のWS_BORDER付与により、フルスクリーン時に画面端へ薄い枠線が
+		// 表示されてしまう(Qtの既知の挙動)。フルスクリーン中はウィンドウを
+		// モニタ範囲よりも枠線の太さの分だけ外側に広げることで、枠線を画面の
+		// 外側へ追い出し、見た目に影響しないようにする。
+		if (windowState() & Qt::WindowFullScreen) {
+			HMONITOR monitor = MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
+			MONITORINFO mi;
+			mi.cbSize = sizeof(mi);
+			if (monitor && GetMonitorInfo(monitor, &mi)) {
+				const int borderX = GetSystemMetrics(SM_CXBORDER);
+				const int borderY = GetSystemMetrics(SM_CYBORDER);
+				RECT target = mi.rcMonitor;
+				target.left -= borderX;
+				target.top -= borderY;
+				target.right += borderX;
+				target.bottom += borderY;
+
+				RECT current;
+				// 既に目的のサイズ・位置になっている場合はSetWindowPosを呼ばない
+				// (再度のWM_SIZE発生によるresizeEventの再帰呼び出しを避けるため)
+				if (GetWindowRect(handle, &current) && !EqualRect(&current, &target)) {
+					SetWindowPos(handle, nullptr,
+						target.left, target.top,
+						target.right - target.left, target.bottom - target.top,
+						SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
+				}
+			}
+		}
 	}
 #endif
 	updateLayout();
