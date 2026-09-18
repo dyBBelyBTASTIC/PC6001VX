@@ -78,24 +78,38 @@ jobs:
       - name: Install mingw-w64 import libraries (pacman)
         shell: cmd
         run: |
-          C:\msys64\usr\bin\bash.exe -lc "pacman -Sy --noconfirm mingw-w64-x86_64-headers mingw-w64-x86_64-crt"
+          C:\msys64\usr\bin\bash.exe -lc "pacman -Sy --noconfirm mingw-w64-x86_64-headers mingw-w64-x86_64-crt mingw-w64-x86_64-SDL2 mingw-w64-x86_64-libvorbis mingw-w64-x86_64-gettext"
 
       - name: Locate Win32 import libraries (MSYS2)
         shell: pwsh
         run: |
-          Write-Host "--- Searching all of C:\msys64 for libadvapi32.a ---"
-          $found = Get-ChildItem -Recurse -Path 'C:\msys64' -ErrorAction SilentlyContinue -Filter 'libadvapi32.a'
-          $found | ForEach-Object { Write-Host "FOUND: $($_.FullName)" }
+          $names = @("libadvapi32.a","libSDL2.a","libogg.a","libvorbis.a","libvorbisenc.a","libvorbisfile.a","libintl.a")
+          $dirs = @()
+          $missing = @()
 
-          if ($found) {
-            $dirs = $found | ForEach-Object { $_.DirectoryName } | Select-Object -Unique
-            Write-Host "RESULT: libadvapi32.a found in: $($dirs -join '; ')"
-            echo "PC6001VX_EXTRA_LIBRARY_PATH=$($dirs -join ';')" >> $env:GITHUB_ENV
-          } else {
-            Write-Warning "RESULT: libadvapi32.a still not found after installing mingw-w64-x86_64-crt."
-            Write-Error "The pacman install may have failed -- check the previous step's output."
+          foreach ($name in $names) {
+            $hit = Get-ChildItem -Recurse -Path 'C:\msys64' -ErrorAction SilentlyContinue -Filter $name | Select-Object -First 1
+            if ($hit) {
+              Write-Host "FOUND: $name -> $($hit.FullName)"
+              $dirs += $hit.DirectoryName
+            } else {
+              Write-Warning "MISSING: $name"
+              $missing += $name
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Error "Could not locate: $($missing -join ', '). Check the pacman install step above."
             exit 1
           }
+
+          $dirs = $dirs | Select-Object -Unique
+          Write-Host "RESULT: using library search path(s): $($dirs -join '; ')"
+          echo "PC6001VX_EXTRA_LIBRARY_PATH=$($dirs -join ';')" >> $env:GITHUB_ENV
+
+          $linkerFlags = ($dirs | ForEach-Object { "-L`"$_`"" }) -join ' '
+          Write-Host "RESULT: linker flags: $linkerFlags"
+          echo "PC6001VX_EXTRA_LINKER_FLAGS=$linkerFlags" >> $env:GITHUB_ENV
 
 
       - name: Configure (CMake)
@@ -109,6 +123,7 @@ jobs:
           "-DPC6001VX_STATIC_GCC=${env:PC6001VX_STATIC_GCC}"
           "-DPC6001VX_STATIC_GCC_EH=${env:PC6001VX_STATIC_GCC_EH}"
           "-DCMAKE_LIBRARY_PATH=${env:PC6001VX_EXTRA_LIBRARY_PATH}"
+          "-DCMAKE_EXE_LINKER_FLAGS=${env:PC6001VX_EXTRA_LINKER_FLAGS}"
         shell: pwsh
 
       - name: Build
