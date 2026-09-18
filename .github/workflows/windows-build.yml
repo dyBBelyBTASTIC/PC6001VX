@@ -67,6 +67,32 @@ jobs:
             echo "PC6001VX_STATIC_GCC_EH=$($gccEh.FullName)" >> $env:GITHUB_ENV
           }
 
+      # Qt's bundled MinGW toolchain doesn't ship generic Win32 import
+      # libraries (advapi32, kernel32, etc.) -- it's just enough to build
+      # Qt-linked apps. Rather than switch compilers (risking ABI mismatch
+      # with the prebuilt Qt binaries), point find_library at the full
+      # mingw-w64 sysroot that GitHub's windows-latest runners already ship
+      # via MSYS2. An import library is just a table of symbol stubs for an
+      # OS DLL, not compiled C++ code, so mixing it in from a different
+      # MinGW distribution carries no ABI risk.
+      - name: Locate Win32 import libraries (MSYS2)
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "C:\msys64\mingw64\x86_64-w64-mingw32\lib",
+            "C:\msys64\mingw64\lib"
+          )
+          $existing = $candidates | Where-Object { Test-Path $_ }
+          Write-Host "Existing candidate lib dirs: $existing"
+
+          if ($existing) {
+            $hasAdvapi32 = $existing | Where-Object { Test-Path (Join-Path $_ "libadvapi32.a") }
+            Write-Host "Dirs containing libadvapi32.a: $hasAdvapi32"
+          }
+
+          echo "PC6001VX_EXTRA_LIBRARY_PATH=$($existing -join ';')" >> $env:GITHUB_ENV
+
+
       - name: Configure (CMake)
         run: >
           cmake -S . -B build -G Ninja
@@ -76,6 +102,7 @@ jobs:
           "-DPC6001VX_STATIC_STDCXX=${env:PC6001VX_STATIC_STDCXX}"
           "-DPC6001VX_STATIC_GCC=${env:PC6001VX_STATIC_GCC}"
           "-DPC6001VX_STATIC_GCC_EH=${env:PC6001VX_STATIC_GCC_EH}"
+          "-DCMAKE_LIBRARY_PATH=${env:PC6001VX_EXTRA_LIBRARY_PATH}"
         shell: pwsh
 
       - name: Build
