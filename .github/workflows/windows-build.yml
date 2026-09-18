@@ -1,0 +1,59 @@
+name: Windows build (test)
+
+# Manual trigger + on every push, so you can just click "Run workflow"
+# from the Actions tab, or push a commit to see it run automatically.
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Installs a prebuilt Qt6 kit for MinGW, plus the matching MinGW
+      # compiler toolchain itself, via aqtinstall.
+      # NOTE: exact version/arch strings drift over time -- if this step
+      # fails, check https://ddalcino.github.io/aqt-list-server/ for
+      # currently-valid combinations and adjust 'version' / 'arch' / 'tools'.
+      - name: Install Qt6 (MinGW)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.3'
+          arch: 'win64_mingw'
+          modules: 'qtmultimedia'
+          tools: 'tools_mingw1310'
+          set-env: true
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Configure (CMake)
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DNOAVI=ON
+          -DNOSOUND=ON
+
+      - name: Build
+        run: ninja -C build PC6001VX
+
+      - name: Bundle Qt DLLs (windeployqt)
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Recurse -Filter "PC6001VX.exe" -Path build | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item $exe.FullName -Destination dist\
+          windeployqt --qmldir . dist\PC6001VX.exe
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PC6001VX-windows-test-build
+          path: dist\
