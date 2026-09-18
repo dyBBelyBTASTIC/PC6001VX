@@ -78,19 +78,24 @@ jobs:
       - name: Locate Win32 import libraries (MSYS2)
         shell: pwsh
         run: |
-          $candidates = @(
-            "C:\msys64\mingw64\x86_64-w64-mingw32\lib",
-            "C:\msys64\mingw64\lib"
-          )
-          $existing = $candidates | Where-Object { Test-Path $_ }
-          Write-Host "Existing candidate lib dirs: $existing"
+          Write-Host "C:\msys64 exists: $(Test-Path 'C:\msys64')"
 
-          if ($existing) {
-            $hasAdvapi32 = $existing | Where-Object { Test-Path (Join-Path $_ "libadvapi32.a") }
-            Write-Host "Dirs containing libadvapi32.a: $hasAdvapi32"
+          $found = $null
+          if (Test-Path 'C:\msys64') {
+            Write-Host "--- Searching all of C:\msys64 for libadvapi32.a ---"
+            $found = Get-ChildItem -Recurse -Path 'C:\msys64' -ErrorAction SilentlyContinue -Filter 'libadvapi32.a'
+            $found | ForEach-Object { Write-Host "FOUND: $($_.FullName)" }
           }
 
-          echo "PC6001VX_EXTRA_LIBRARY_PATH=$($existing -join ';')" >> $env:GITHUB_ENV
+          if ($found) {
+            $dirs = $found | ForEach-Object { $_.DirectoryName } | Select-Object -Unique
+            Write-Host "RESULT: libadvapi32.a found in: $($dirs -join '; ')"
+            echo "PC6001VX_EXTRA_LIBRARY_PATH=$($dirs -join ';')" >> $env:GITHUB_ENV
+          } else {
+            Write-Warning "RESULT: libadvapi32.a NOT found anywhere under C:\msys64."
+            Write-Error "Cannot proceed: no source of libadvapi32.a was found on this runner. See the directory dump above for other candidates."
+            exit 1
+          }
 
 
       - name: Configure (CMake)
