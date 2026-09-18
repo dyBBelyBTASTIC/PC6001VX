@@ -35,29 +35,37 @@ jobs:
         uses: seanmiddleditch/gha-setup-ninja@master
 
       # The project's CMakeLists.txt requires static libstdc++.a / libgcc.a /
-      # libgcc_eh.a and looks for them at a hardcoded path under the MinGW
-      # install that doesn't match every MinGW layout (e.g. Qt's own
-      # tools_mingw package). Ask the compiler itself where its runtime
-      # archives actually are -- this works regardless of layout -- and feed
-      # the results in as pre-seeded cache variables so the project's
-      # find_file(... REQUIRED) calls succeed without needing to patch it.
+      # libgcc_eh.a. Rather than trust `g++ -print-file-name` (which returned
+      # a mangled/incomplete result last run and needs investigating), do a
+      # real recursive filesystem search across the actual Qt MinGW install
+      # so we know for certain what's actually shipped and where.
       - name: Locate static MinGW runtime libraries
         shell: pwsh
         run: |
-          $stdcxx = (g++ -print-file-name=libstdc++.a).Trim()
-          $gcc    = (g++ -print-file-name=libgcc.a).Trim()
-          $gccEh  = (g++ -print-file-name=libgcc_eh.a).Trim()
+          $mingwRoot = (Split-Path (Split-Path (Get-Command g++).Source))
+          Write-Host "MinGW root: $mingwRoot"
 
-          foreach ($pair in @(("libstdc++.a", $stdcxx), ("libgcc.a", $gcc), ("libgcc_eh.a", $gccEh))) {
-            if (-not (Test-Path $pair[1])) {
-              Write-Error "Could not locate $($pair[0]) via g++ -print-file-name (got: $($pair[1]))"
-              exit 1
-            }
+          Write-Host "--- Full directory tree (first 200 entries) ---"
+          Get-ChildItem -Recurse -Path $mingwRoot -ErrorAction SilentlyContinue |
+            Select-Object -First 200 -ExpandProperty FullName
+
+          Write-Host "--- Searching for libstdc++*.a, libgcc*.a anywhere under MinGW root ---"
+          $found = Get-ChildItem -Recurse -Path $mingwRoot -ErrorAction SilentlyContinue -Include "libstdc++*.a","libgcc*.a"
+          $found | ForEach-Object { Write-Host $_.FullName }
+
+          $stdcxx = $found | Where-Object { $_.Name -eq "libstdc++.a" } | Select-Object -First 1
+          $gcc    = $found | Where-Object { $_.Name -eq "libgcc.a" }    | Select-Object -First 1
+          $gccEh  = $found | Where-Object { $_.Name -eq "libgcc_eh.a" } | Select-Object -First 1
+
+          if (-not $stdcxx -or -not $gcc -or -not $gccEh) {
+            Write-Warning "One or more static runtime archives were not found anywhere under $mingwRoot."
+            Write-Warning "This likely means this MinGW distribution only ships the shared runtime (DLLs), not static archives."
+            # Don't fail here -- let the facts above be visible in the log so we can decide the next step.
+          } else {
+            echo "PC6001VX_STATIC_STDCXX=$($stdcxx.FullName)" >> $env:GITHUB_ENV
+            echo "PC6001VX_STATIC_GCC=$($gcc.FullName)" >> $env:GITHUB_ENV
+            echo "PC6001VX_STATIC_GCC_EH=$($gccEh.FullName)" >> $env:GITHUB_ENV
           }
-
-          echo "PC6001VX_STATIC_STDCXX=$stdcxx" >> $env:GITHUB_ENV
-          echo "PC6001VX_STATIC_GCC=$gcc" >> $env:GITHUB_ENV
-          echo "PC6001VX_STATIC_GCC_EH=$gccEh" >> $env:GITHUB_ENV
 
       - name: Configure (CMake)
         run: >
