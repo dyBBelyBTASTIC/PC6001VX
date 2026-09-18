@@ -67,33 +67,33 @@ jobs:
             echo "PC6001VX_STATIC_GCC_EH=$($gccEh.FullName)" >> $env:GITHUB_ENV
           }
 
-      # Qt's bundled MinGW toolchain doesn't ship generic Win32 import
-      # libraries (advapi32, kernel32, etc.) -- it's just enough to build
-      # Qt-linked apps. Rather than switch compilers (risking ABI mismatch
-      # with the prebuilt Qt binaries), point find_library at the full
-      # mingw-w64 sysroot that GitHub's windows-latest runners already ship
-      # via MSYS2. An import library is just a table of symbol stubs for an
-      # OS DLL, not compiled C++ code, so mixing it in from a different
-      # MinGW distribution carries no ABI risk.
+      # GitHub's windows-latest runners ship a bare MSYS2 base install --
+      # the actual mingw-w64 toolchain packages (which provide the Win32
+      # import libraries like libadvapi32.a) aren't installed by default.
+      # Install just the small headers/crt package that provides them via
+      # pacman, rather than switching compilers or doing anything more
+      # invasive. This only supplies stub/import libraries (symbol tables
+      # for OS DLLs), not compiled code, so there's no ABI concern mixing
+      # it with Qt's own MinGW compiler.
+      - name: Install mingw-w64 import libraries (pacman)
+        shell: cmd
+        run: |
+          C:\msys64\usr\bin\bash.exe -lc "pacman -Sy --noconfirm mingw-w64-x86_64-headers mingw-w64-x86_64-crt"
+
       - name: Locate Win32 import libraries (MSYS2)
         shell: pwsh
         run: |
-          Write-Host "C:\msys64 exists: $(Test-Path 'C:\msys64')"
-
-          $found = $null
-          if (Test-Path 'C:\msys64') {
-            Write-Host "--- Searching all of C:\msys64 for libadvapi32.a ---"
-            $found = Get-ChildItem -Recurse -Path 'C:\msys64' -ErrorAction SilentlyContinue -Filter 'libadvapi32.a'
-            $found | ForEach-Object { Write-Host "FOUND: $($_.FullName)" }
-          }
+          Write-Host "--- Searching all of C:\msys64 for libadvapi32.a ---"
+          $found = Get-ChildItem -Recurse -Path 'C:\msys64' -ErrorAction SilentlyContinue -Filter 'libadvapi32.a'
+          $found | ForEach-Object { Write-Host "FOUND: $($_.FullName)" }
 
           if ($found) {
             $dirs = $found | ForEach-Object { $_.DirectoryName } | Select-Object -Unique
             Write-Host "RESULT: libadvapi32.a found in: $($dirs -join '; ')"
             echo "PC6001VX_EXTRA_LIBRARY_PATH=$($dirs -join ';')" >> $env:GITHUB_ENV
           } else {
-            Write-Warning "RESULT: libadvapi32.a NOT found anywhere under C:\msys64."
-            Write-Error "Cannot proceed: no source of libadvapi32.a was found on this runner. See the directory dump above for other candidates."
+            Write-Warning "RESULT: libadvapi32.a still not found after installing mingw-w64-x86_64-crt."
+            Write-Error "The pacman install may have failed -- check the previous step's output."
             exit 1
           }
 
