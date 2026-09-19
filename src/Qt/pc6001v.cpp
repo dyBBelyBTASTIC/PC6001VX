@@ -25,7 +25,8 @@ int main( int argc, char *argv[] )
 	parser.addOptions({
 		{{"l", "loadstate"}, "Load state <file> at startup.", "file"},
 		{{"f", "fullscreen"}, "Start in fullscreen mode."},
-		{{"t", "tape"}, "Attach tape <file> at startup.", "file"}
+		{{"t", "tape"}, "Attach tape <file> at startup.", "file"},
+		{{"a", "autotype"}, "Auto-type <file> at startup.", "file"}
 		});
 	parser.addVersionOption();
 	parser.addHelpOption();
@@ -38,6 +39,9 @@ int main( int argc, char *argv[] )
 	}
 	if (parser.isSet("tape")){
 		app.setProperty("tapefile", parser.value("tape"));
+	}
+	if (parser.isSet("autotype")){
+		app.setProperty("autotypefile", parser.value("autotype"));
 	}
 
 	QLocale locale;

@@ -855,6 +855,22 @@ void P6VXApp::executeEmulation()
 		// スタートアップファイル名をリセット
 		setProperty("tapefile", QVariant());
 	}
+
+	// -a/--autotype 起動オプションによる打込み代行。
+	// EV_DROPFILEと違い拡張子を問わず必ず打込み代行として扱うため、
+	// 専用のEV_AUTOTYPEFILEイベントを使う。
+	auto autoTypeFile = property("autotypefile");
+	if (autoTypeFile.isValid()){
+		auto filename = autoTypeFile.toString().toStdString();
+		char *data = new char[filename.length()+1];
+		strcpy(data, filename.c_str());
+		Event ev;
+		ev.type = EV_AUTOTYPEFILE;
+		ev.drop.file = data;
+		OSD_PushEvent(ev);
+		// スタートアップファイル名をリセット
+		setProperty("autotypefile", QVariant());
+	}
 }
 
 //仮想マシン終了後の処理
