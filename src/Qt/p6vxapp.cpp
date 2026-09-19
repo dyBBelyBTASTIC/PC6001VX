@@ -358,15 +358,6 @@ bool P6VXApp::folderDialog(void *hwnd, char *Result)
 
 void P6VXApp::createWindow(HWINDOW Wh, int width, int height, bool fsflag)
 {
-	// -f/--fullscreen 起動オプションによる一度限りの上書き。
-	// Cfg(CB_FullScreen)には触れないため、保存済み設定を書き換えることはない。
-	// 初回のウィンドウ作成時にのみ適用し、以降のフルスクリーン切り替えを
-	// 妨げないようここで消費(クリア)する。
-	if (property("fullscreen").toBool()) {
-		fsflag = true;
-		setProperty("fullscreen", QVariant());
-	}
-
 	RenderView* view = reinterpret_cast<RenderView*>(Wh);
 	Q_ASSERT(view);
 	view->setSceneSize(width, height);
@@ -1133,6 +1124,16 @@ void P6VXApp::overrideSettings(std::shared_ptr<CFG6>& cfg)
 
 	// サンプリングレートは44100に固定
 	cfg->SetValue(CV_SampleRate, 44100);
+
+	// -f/--fullscreen 起動オプションによる上書き。
+	// この時点でCfg(メモリ上)の値を書き換えることで、初回のウィンドウ作成と
+	// その直後に走る整合性チェック(graph.cpp の ResizeScreen 等、実際の
+	// ウィンドウ状態と設定値の食い違いを検知して作り直す処理)の両方に
+	// 一貫した値が見えるようにする。設定ファイルへの書き込みはここでは
+	// 行わないため、明示的にCfg->Write()が呼ばれない限りは保存されない。
+	if (property("fullscreen").toBool()) {
+		cfg->SetValue(CB_FullScreen, true);
+	}
 }
 
 QFileDialog *P6VXApp::createFileDialog(void *hwnd)
