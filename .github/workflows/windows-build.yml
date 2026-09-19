@@ -83,17 +83,38 @@ jobs:
       - name: Locate Win32 import libraries (MSYS2)
         shell: pwsh
         run: |
-          $names = @("libadvapi32.a","libSDL2.a","libogg.a","libvorbis.a","libvorbisenc.a","libvorbisfile.a","libintl.a")
+          $names = @{
+            "libadvapi32.a"    = "ADVAPI32"
+            "libSDL2.a"        = "SDL2"
+            "libogg.a"         = "OGG"
+            "libvorbis.a"      = "VORBIS"
+            "libvorbisenc.a"   = "VORBISENC"
+            "libvorbisfile.a"  = "VORBISFILE"
+            "libintl.a"        = "INTL"
+          }
           $dirs = @()
           $missing = @()
 
-          foreach ($name in $names) {
+          foreach ($name in $names.Keys) {
             $hit = Get-ChildItem -Recurse -Path 'C:\msys64' -ErrorAction SilentlyContinue -Filter $name | Select-Object -First 1
+            if (-not $hit) {
+              # Fall back to the .dll.a import-library variant -- since we
+              # use an exact absolute path (not -lNAME search), this still
+              # links fine, it just means the final .exe depends on the
+              # matching runtime DLL at runtime instead of being fully static.
+              $dllaName = $name -replace '\.a$', '.dll.a'
+              $hit = Get-ChildItem -Recurse -Path 'C:\msys64' -ErrorAction SilentlyContinue -Filter $dllaName | Select-Object -First 1
+              if ($hit) {
+                Write-Warning "$name not found as a true static archive; using dynamic import lib $dllaName instead. The built .exe will need the matching runtime DLL alongside it."
+              }
+            }
             if ($hit) {
               Write-Host "FOUND: $name -> $($hit.FullName)"
               $dirs += $hit.DirectoryName
+              $varName = "PC6001VX_LIBPATH_$($names[$name])"
+              echo "$varName=$($hit.FullName)" >> $env:GITHUB_ENV
             } else {
-              Write-Warning "MISSING: $name"
+              Write-Warning "MISSING: $name (and $($name -replace '\.a$', '.dll.a'))"
               $missing += $name
             }
           }
@@ -103,8 +124,11 @@ jobs:
             exit 1
           }
 
+          # Still needed for CMAKE_LIBRARY_PATH: SingleApplication's own
+          # find_library(advapi32) call at configure time resolves to an
+          # absolute path via this variable, which is safe (configure-time
+          # only, not a link-time -L that could shadow CRT libraries).
           $dirs = $dirs | Select-Object -Unique
-          Write-Host "RESULT: using library search path(s): $($dirs -join '; ')"
           echo "PC6001VX_EXTRA_LIBRARY_PATH=$($dirs -join ';')" >> $env:GITHUB_ENV
 
 
@@ -119,7 +143,12 @@ jobs:
           "-DPC6001VX_STATIC_GCC=${env:PC6001VX_STATIC_GCC}"
           "-DPC6001VX_STATIC_GCC_EH=${env:PC6001VX_STATIC_GCC_EH}"
           "-DCMAKE_LIBRARY_PATH=${env:PC6001VX_EXTRA_LIBRARY_PATH}"
-          "-DPC6001VX_EXTRA_LINK_DIRS=${env:PC6001VX_EXTRA_LIBRARY_PATH}"
+          "-DPC6001VX_LIB_SDL2=${env:PC6001VX_LIBPATH_SDL2}"
+          "-DPC6001VX_LIB_OGG=${env:PC6001VX_LIBPATH_OGG}"
+          "-DPC6001VX_LIB_VORBIS=${env:PC6001VX_LIBPATH_VORBIS}"
+          "-DPC6001VX_LIB_VORBISENC=${env:PC6001VX_LIBPATH_VORBISENC}"
+          "-DPC6001VX_LIB_VORBISFILE=${env:PC6001VX_LIBPATH_VORBISFILE}"
+          "-DPC6001VX_LIB_INTL=${env:PC6001VX_LIBPATH_INTL}"
         shell: pwsh
 
       - name: Build
