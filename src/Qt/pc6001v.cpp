@@ -24,7 +24,8 @@ int main( int argc, char *argv[] )
 	parser.setApplicationDescription("NEC PC-6001 Emulator");
 	parser.addOptions({
 		{{"l", "loadstate"}, "Load state <file> at startup.", "file"},
-		{{"f", "fullscreen"}, "Start in fullscreen mode."}
+		{{"f", "fullscreen"}, "Start in fullscreen mode."},
+		{{"t", "tape"}, "Attach tape <file> at startup.", "file"}
 		});
 	parser.addVersionOption();
 	parser.addHelpOption();
@@ -34,6 +35,9 @@ int main( int argc, char *argv[] )
 	}
 	if (parser.isSet("fullscreen")){
 		app.setProperty("fullscreen", true);
+	}
+	if (parser.isSet("tape")){
+		app.setProperty("tapefile", parser.value("tape"));
 	}
 
 	QLocale locale;

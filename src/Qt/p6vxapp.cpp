@@ -838,6 +838,23 @@ void P6VXApp::executeEmulation()
 	Adaptor->setEmulationObj(P6Core);
 	emit vmPrepared(Restart);
 	P6Core->Start();
+
+	// -t/--tape 起動オプションによるTAPEファイル添付。
+	// ドラッグ&ドロップ(RenderView::dropEvent)と全く同じ仕組み
+	// (EV_DROPFILEイベント)を使うことで、拡張子判定を含む既存の処理を
+	// そのまま再利用する。
+	auto tapeFile = property("tapefile");
+	if (tapeFile.isValid()){
+		auto filename = tapeFile.toString().toStdString();
+		char *data = new char[filename.length()+1];
+		strcpy(data, filename.c_str());
+		Event ev;
+		ev.type = EV_DROPFILE;
+		ev.drop.file = data;
+		OSD_PushEvent(ev);
+		// スタートアップファイル名をリセット
+		setProperty("tapefile", QVariant());
+	}
 }
 
 //仮想マシン終了後の処理
