@@ -555,27 +555,41 @@ if(WIN32)
         "-Wl,-Bdynamic"
     )
 
-    # Optional extra library search directories, scoped to just this target
-    # (not a global linker flag) so they can't shadow the toolchain's own
-    # CRT/runtime libraries during CMake's compiler sanity checks or any
-    # other target's link step. Empty/unset by default -- a normal build is
-    # unaffected. Intended for CI environments where the MinGW toolchain
-    # itself doesn't ship every Win32 import library (advapi32, SDL2,
-    # vorbis, intl, etc.) and they're supplied from elsewhere.
-    if(PC6001VX_EXTRA_LINK_DIRS)
-        target_link_directories(PC6001VX PRIVATE ${PC6001VX_EXTRA_LINK_DIRS})
-    endif()
+    # Link items for a handful of third-party/runtime libraries. These
+    # default to the original bare names (identical to the official build),
+    # but can be overridden to an absolute path via -D from the command
+    # line. This exists so a CI environment whose MinGW toolchain doesn't
+    # ship these (e.g. Qt's own bundled compiler) can supply them from
+    # elsewhere by exact file path -- deliberately NOT via an extra -L
+    # search directory, because a directory from a different/newer MinGW
+    # distribution can shadow this toolchain's own CRT-support libraries
+    # (symbols like _gnu_exception_handler are version-specific) for
+    # anything else resolved later in the same link.
+    set(PC6001VX_LIB_SDL2 "SDL2" CACHE STRING "Link item for SDL2 (name or absolute path)")
+    set(PC6001VX_LIB_OGG "ogg" CACHE STRING "Link item for ogg (name or absolute path)")
+    set(PC6001VX_LIB_VORBIS "vorbis" CACHE STRING "Link item for vorbis (name or absolute path)")
+    set(PC6001VX_LIB_VORBISENC "vorbisenc" CACHE STRING "Link item for vorbisenc (name or absolute path)")
+    set(PC6001VX_LIB_VORBISFILE "vorbisfile" CACHE STRING "Link item for vorbisfile (name or absolute path)")
+    set(PC6001VX_LIB_INTL "intl" CACHE STRING "Link item for intl/gettext (name or absolute path)")
+    mark_as_advanced(
+        PC6001VX_LIB_SDL2
+        PC6001VX_LIB_OGG
+        PC6001VX_LIB_VORBIS
+        PC6001VX_LIB_VORBISENC
+        PC6001VX_LIB_VORBISFILE
+        PC6001VX_LIB_INTL
+    )
 
     target_link_libraries(PC6001VX PRIVATE
         "-Wl,-Bstatic"
         winpthread
         pthread
-        SDL2
-        ogg
-        vorbis
-        vorbisenc
-        vorbisfile
-        intl
+        ${PC6001VX_LIB_SDL2}
+        ${PC6001VX_LIB_OGG}
+        ${PC6001VX_LIB_VORBIS}
+        ${PC6001VX_LIB_VORBISENC}
+        ${PC6001VX_LIB_VORBISFILE}
+        ${PC6001VX_LIB_INTL}
         iconv
         crypt32
         ws2_32
