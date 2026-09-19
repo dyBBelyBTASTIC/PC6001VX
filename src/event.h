@@ -45,6 +45,7 @@ typedef enum {
 	EV_WINDOWEVENT_MINIMIZED,	// Window minimized
 	EV_WINDOWEVENT_MAXIMIZED,	// Window maximized
 	EV_WINDOWEVENT_RESTORED,	// Window restored to normal size and position
+	EV_AUTOTYPEFILE,			// Auto-type file requested (no extension check, unlike EV_DROPFILE)
 	
 	EV_NOEVENT
 } EventType;
@@ -152,9 +153,9 @@ typedef struct {
 	EventType type;		// EV_CAPTURE
 } Event_Capture;
 
-// Drag & Drop
+// Drag & Drop / Auto-type file
 typedef struct {
-	EventType type;		// EV_DROPFILE
+	EventType type;		// EV_DROPFILE or EV_AUTOTYPEFILE
 	char* file;			// イベント処理後に必ずメモリを開放する
 } Event_Drop;
 

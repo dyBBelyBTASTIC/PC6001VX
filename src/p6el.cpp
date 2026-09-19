@@ -755,6 +755,16 @@ EL6::ReturnCode EL6::EventLoop( ReturnCode rc )
 			}
 			break;
 			
+		case EV_AUTOTYPEFILE:	// 打込み代行(拡張子を問わず必ず打込み代行として扱う)
+			{
+				P6VPATH fpath = STR2P6VPATH( event.drop.file );
+				// ファイル名を開放
+				delete [] event.drop.file;
+				
+				UI_AutoType( fpath );
+			}
+			break;
+			
 		case EV_QUIT:			// 終了
 			// もし未処理のEV_CAPTUREが残っていたら1周待ってからEV_QUIT
 			if( OSD_HasEvent( EV_CAPTURE ) ){
