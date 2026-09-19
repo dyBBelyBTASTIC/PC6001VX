@@ -843,15 +843,22 @@ void P6VXApp::executeEmulation()
 	// ドラッグ&ドロップ(RenderView::dropEvent)と全く同じ仕組み
 	// (EV_DROPFILEイベント)を使うことで、拡張子判定を含む既存の処理を
 	// そのまま再利用する。
+	// vmPreparedはQueuedConnectionでAdaptor(別スレッド)のdoEventLoop()に
+	// つながっており、その先頭でOSD_FlushEvents()がイベントキューを
+	// 全消去する。ここで即座にプッシュすると、そのフラッシュより先に
+	// 積まれてしまい消されることがある(タイミング依存で不定)。
+	// 短い遅延を挟むことで、フラッシュが確実に完了してから積む。
 	auto tapeFile = property("tapefile");
 	if (tapeFile.isValid()){
 		auto filename = tapeFile.toString().toStdString();
-		char *data = new char[filename.length()+1];
-		strcpy(data, filename.c_str());
-		Event ev;
-		ev.type = EV_DROPFILE;
-		ev.drop.file = data;
-		OSD_PushEvent(ev);
+		QTimer::singleShot(500, this, [filename]() {
+			char *data = new char[filename.length()+1];
+			strcpy(data, filename.c_str());
+			Event ev;
+			ev.type = EV_DROPFILE;
+			ev.drop.file = data;
+			OSD_PushEvent(ev);
+		});
 		// スタートアップファイル名をリセット
 		setProperty("tapefile", QVariant());
 	}
@@ -865,10 +872,12 @@ void P6VXApp::executeEmulation()
 	// 即座にイベントを投入すると起動シーケンスの途中でキー入力が失われ、
 	// 症状が不定(タイミング依存)になることがある。実時間で少し待って
 	// から投入することで、起動が完了している可能性を高める。
+	// (内部の約1秒待ちと合わせて合計約2.5秒。あくまで経験則の値であり、
+	// 短くするほど遅い環境では再び不安定になるリスクとのトレードオフ)
 	auto autoTypeFile = property("autotypefile");
 	if (autoTypeFile.isValid()){
 		auto filename = autoTypeFile.toString().toStdString();
-		QTimer::singleShot(3000, this, [filename]() {
+		QTimer::singleShot(1500, this, [filename]() {
 			char *data = new char[filename.length()+1];
 			strcpy(data, filename.c_str());
 			Event ev;
