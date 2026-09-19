@@ -360,8 +360,11 @@ void P6VXApp::createWindow(HWINDOW Wh, int width, int height, bool fsflag)
 {
 	// -f/--fullscreen 起動オプションによる一度限りの上書き。
 	// Cfg(CB_FullScreen)には触れないため、保存済み設定を書き換えることはない。
+	// 初回のウィンドウ作成時にのみ適用し、以降のフルスクリーン切り替えを
+	// 妨げないようここで消費(クリア)する。
 	if (property("fullscreen").toBool()) {
 		fsflag = true;
+		setProperty("fullscreen", QVariant());
 	}
 
 	RenderView* view = reinterpret_cast<RenderView*>(Wh);
