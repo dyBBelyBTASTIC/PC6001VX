@@ -358,6 +358,12 @@ bool P6VXApp::folderDialog(void *hwnd, char *Result)
 
 void P6VXApp::createWindow(HWINDOW Wh, int width, int height, bool fsflag)
 {
+	// -f/--fullscreen 起動オプションによる一度限りの上書き。
+	// Cfg(CB_FullScreen)には触れないため、保存済み設定を書き換えることはない。
+	if (property("fullscreen").toBool()) {
+		fsflag = true;
+	}
+
 	RenderView* view = reinterpret_cast<RenderView*>(Wh);
 	Q_ASSERT(view);
 	view->setSceneSize(width, height);

@@ -23,13 +23,17 @@ int main( int argc, char *argv[] )
 	QCommandLineParser parser;
 	parser.setApplicationDescription("NEC PC-6001 Emulator");
 	parser.addOptions({
-		{{"l", "loadstate"}, "Load state <file> at startup.", "file"}
+		{{"l", "loadstate"}, "Load state <file> at startup.", "file"},
+		{{"f", "fullscreen"}, "Start in fullscreen mode."}
 		});
 	parser.addVersionOption();
 	parser.addHelpOption();
 	parser.process(app);
 	if (parser.isSet("loadstate")){
 		app.setProperty("loadstate", parser.value("loadstate"));
+	}
+	if (parser.isSet("fullscreen")){
+		app.setProperty("fullscreen", true);
 	}
 
 	QLocale locale;
