@@ -137,7 +137,6 @@ jobs:
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DNOAVI=ON
-          -DNOSOUND=ON
           "-DCMAKE_CXX_FLAGS=-DNOLIBINTL"
           "-DPC6001VX_STATIC_STDCXX=${env:PC6001VX_STATIC_STDCXX}"
           "-DPC6001VX_STATIC_GCC=${env:PC6001VX_STATIC_GCC}"
