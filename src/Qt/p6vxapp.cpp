@@ -859,15 +859,23 @@ void P6VXApp::executeEmulation()
 	// -a/--autotype 起動オプションによる打込み代行。
 	// EV_DROPFILEと違い拡張子を問わず必ず打込み代行として扱うため、
 	// 専用のEV_AUTOTYPEFILEイベントを使う。
+	// メニュー操作やドラッグ&ドロップと異なり、この時点ではまだ実機の
+	// 起動処理(BASIC起動等)が進行中の可能性がある。SetAutoKeyFile内部の
+	// 待ち(約1秒)はREADY状態で呼ばれる前提のものなので、起動直後に
+	// 即座にイベントを投入すると起動シーケンスの途中でキー入力が失われ、
+	// 症状が不定(タイミング依存)になることがある。実時間で少し待って
+	// から投入することで、起動が完了している可能性を高める。
 	auto autoTypeFile = property("autotypefile");
 	if (autoTypeFile.isValid()){
 		auto filename = autoTypeFile.toString().toStdString();
-		char *data = new char[filename.length()+1];
-		strcpy(data, filename.c_str());
-		Event ev;
-		ev.type = EV_AUTOTYPEFILE;
-		ev.drop.file = data;
-		OSD_PushEvent(ev);
+		QTimer::singleShot(3000, this, [filename]() {
+			char *data = new char[filename.length()+1];
+			strcpy(data, filename.c_str());
+			Event ev;
+			ev.type = EV_AUTOTYPEFILE;
+			ev.drop.file = data;
+			OSD_PushEvent(ev);
+		});
 		// スタートアップファイル名をリセット
 		setProperty("autotypefile", QVariant());
 	}
