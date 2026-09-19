@@ -555,6 +555,17 @@ if(WIN32)
         "-Wl,-Bdynamic"
     )
 
+    # Optional extra library search directories, scoped to just this target
+    # (not a global linker flag) so they can't shadow the toolchain's own
+    # CRT/runtime libraries during CMake's compiler sanity checks or any
+    # other target's link step. Empty/unset by default -- a normal build is
+    # unaffected. Intended for CI environments where the MinGW toolchain
+    # itself doesn't ship every Win32 import library (advapi32, SDL2,
+    # vorbis, intl, etc.) and they're supplied from elsewhere.
+    if(PC6001VX_EXTRA_LINK_DIRS)
+        target_link_directories(PC6001VX PRIVATE ${PC6001VX_EXTRA_LINK_DIRS})
+    endif()
+
     target_link_libraries(PC6001VX PRIVATE
         "-Wl,-Bstatic"
         winpthread
